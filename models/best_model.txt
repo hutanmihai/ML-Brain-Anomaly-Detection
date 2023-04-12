@@ -1,0 +1,56 @@
+ batch_size = 35
+ image_size = (224, 224)
+ 0.73 cu putin overfitting
+
+
+Conv2D(filters=32, kernel_size=3, padding='same',
+       input_shape=(image_resize[0], image_resize[1], 1)),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=32, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+MaxPooling2D(),
+Dropout(0.2),
+
+Conv2D(filters=64, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=64, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+MaxPooling2D(),
+Dropout(0.2),
+
+Conv2D(filters=128, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=128, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=128, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+MaxPooling2D(),
+Dropout(0.2),
+
+Conv2D(filters=256, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=256, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+Conv2D(filters=256, kernel_size=3, padding='same'),
+BatchNormalization(),
+ReLU(),
+MaxPooling2D(),
+Dropout(0.2),
+
+Flatten(),
+Dense(256),
+ReLU(),
+BatchNormalization(),
+Dense(256),
+ReLU(),
+BatchNormalization(),
+Dense(1, activation='sigmoid')
