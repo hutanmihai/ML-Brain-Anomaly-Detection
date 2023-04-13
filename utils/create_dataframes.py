@@ -22,6 +22,5 @@ test_dataframe = pd.DataFrame()
 test_dataframe['id'] = [str(i).zfill(6) + '.png' for i in range(17001, 22149 + 1)]
 
 train_df.to_csv('../data_frames/train_dataframe.csv', index=False, header=False, columns=['id', 'class'])
-validation_df.to_csv('../data_frames/validation_dataframe.csv', index=False, header=False,
-                            columns=['id', 'class'])
+validation_df.to_csv('../data_frames/validation_dataframe.csv', index=False, header=False, columns=['id', 'class'])
 test_dataframe.to_csv('../data_frames/test_dataframe.csv', index=False, header=False, columns=['id'])

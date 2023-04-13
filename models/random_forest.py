@@ -2,7 +2,7 @@ import numpy as np
 from time import time
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import preprocessing
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, classification_report
 from utils.write import write
 
 if __name__ == '__main__':
@@ -34,5 +34,4 @@ if __name__ == '__main__':
     end_time = time() - start_time
     print(f"------------------- {end_time} seconds -------------------")
 
-# 0.5545927209705372 cu slice 7000 fara efecte
-# 0.5614617940199335 cu slice 6000 fara efecte
+    print(classification_report(validation_labels, model.predict(validation_images)))

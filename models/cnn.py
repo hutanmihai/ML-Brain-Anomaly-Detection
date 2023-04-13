@@ -1,3 +1,4 @@
+import itertools
 import os
 from time import time
 
@@ -5,13 +6,13 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from keras.callbacks import ReduceLROnPlateau, EarlyStopping
-from keras.callbacks import TensorBoard, ModelCheckpoint
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization, ReLU
-from keras.losses import binary_crossentropy
+from keras.losses import binary_crossentropy, binary_focal_crossentropy
 from keras.models import Sequential
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.utils import class_weight
 
 from utils.write import write
@@ -40,25 +41,6 @@ data_dir_path = os.path.join(os.getcwd(), '../data/data/')
 batch_size = 35
 image_resize = (224, 224)
 
-
-# DATA AUGMENTATION FUNCTION
-def contrast_stretching(image, min_output=0, max_output=255):
-    # Find the minimum and maximum pixel values in the image
-    min_input = np.min(image)
-    max_input = np.max(image)
-
-    # Check if the input image has any variation in pixel values
-    if min_input == max_input:
-        return image
-
-    # Calculate the scaling factor
-    scale_factor = (max_output - min_output) / (max_input - min_input)
-
-    # Apply contrast stretching to the image
-    stretched_image = (image - min_input) * scale_factor + min_output
-    return stretched_image
-
-
 # DATA GENERATORS
 train_data_gen = ImageDataGenerator(
     rescale=1. / 255.0,
@@ -67,18 +49,15 @@ train_data_gen = ImageDataGenerator(
     zoom_range=0.1,
     rotation_range=15,
     fill_mode='nearest',
-    horizontal_flip=True,
-    preprocessing_function=contrast_stretching,
+    horizontal_flip=True
 )
 
 validation_data_gen = ImageDataGenerator(
-    rescale=1. / 255.0,
-    preprocessing_function=contrast_stretching,
+    rescale=1. / 255.0
 )
 
 test_data_gen = ImageDataGenerator(
-    rescale=1. / 255.0,
-    preprocessing_function=contrast_stretching,
+    rescale=1. / 255.0
 )
 
 train_generator = train_data_gen.flow_from_dataframe(
@@ -135,9 +114,6 @@ learn_rate = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, verbose=1
 
 early_stop = EarlyStopping(monitor='val_score', min_delta=1e-4, patience=60, verbose=1, mode='max', baseline=None,
                            restore_best_weights=True)
-
-checkpoint_path = "saved_models/model_weights.{epoch:02d}-{val_loss:.2f}--{val_score:.2f}.h5"
-checkpoint_callback = ModelCheckpoint(checkpoint_path, verbose=0)
 
 tensorboard = TensorBoard(log_dir=f"logs/{time()}")
 
@@ -206,27 +182,44 @@ model.compile(optimizer=Adam(learning_rate=0.001), loss=binary_crossentropy, met
 
 history = model.fit(train_generator, epochs=500, batch_size=batch_size, verbose=1,
                     validation_data=validation_generator, class_weight=class_weights,
-                    callbacks=[early_stop, tensorboard, learn_rate, checkpoint_callback])
+                    callbacks=[early_stop, tensorboard, learn_rate])
 
 print(f"--------------------------- {time() - start} ---------------------------")
 
-plt.figure()
-plt.plot(history.history['score'])
-plt.plot(history.history['val_score'])
-plt.title('Model Score')
-plt.ylabel('F1 Score')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper left')
-plt.show()
 
-plt.figure()
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('Model loss')
-plt.ylabel('Loss')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper left')
-plt.show()
+# CONFUSION MATRIX
+def show(matrix, type):
+    classes = [0, 1]
+    plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix " + type)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+    fmt = 'd'
+    thresh = matrix.max() / 2.
+    for i, j in itertools.product(range(matrix.shape[0]), range(matrix.shape[1])):
+        plt.text(j, i, format(matrix[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if matrix[i, j] > thresh else "black")
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
+
+train_predicted_labels = model.predict(train_generator, verbose=1)
+train_predicted_labels = np.round(train_predicted_labels).astype(int).reshape(-1, )
+train_classes = train_generator.classes
+cm = confusion_matrix(train_classes, train_predicted_labels)
+show(cm, "Train")
+
+val_predicted_labels = model.predict(validation_generator, verbose=1)
+val_predicted_labels = np.round(val_predicted_labels).astype(int).reshape(-1, )
+val_classes = validation_generator.classes
+cm = confusion_matrix(val_classes, val_predicted_labels)
+show(cm, "Validation")
+
+print(classification_report(val_classes, val_predicted_labels))
 
 # WRITE TEST PREDICTIONS
 predicted_labels = model.predict(test_generator, verbose=1)

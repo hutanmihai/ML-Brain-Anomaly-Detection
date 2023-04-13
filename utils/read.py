@@ -1,5 +1,5 @@
 import numpy as np
-from PIL import Image, ImageFilter, ImageEnhance
+from PIL import Image, ImageEnhance
 from time import time
 
 
@@ -78,7 +78,7 @@ def generate_numpy_arrays_for_train_and_validation():
         test_data.append(generate_numpy_array(image_path))
 
     # SLICE DATA
-    slice_size = 2500
+    slice_size = 6000
     train_data_0 = train_data_0[:slice_size]
     train_labels_0 = train_labels_0[:slice_size]
 
