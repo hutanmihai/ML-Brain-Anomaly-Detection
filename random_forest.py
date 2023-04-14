@@ -34,7 +34,7 @@ def generate_numpy_array(image_path: str) -> np.ndarray:
 # and opening the train_labels.txt and validation_labels.txt files
 # as well as reading the images from the data directory
 def generate_numpy_arrays_for_train_and_validation():
-    data_dir = '../data/data/'
+    data_dir = 'data/data/'
     train_txt = '../data/train_labels.txt'
     validation_txt = '../data/validation_labels.txt'
 

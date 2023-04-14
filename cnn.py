@@ -4,7 +4,7 @@ from time import time
 import keras.backend as kb
 import numpy as np
 import pandas as pd
-from keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard, ModelCheckpoint
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization, ReLU
 from keras.losses import binary_crossentropy
 from keras.models import Sequential
@@ -14,19 +14,19 @@ from sklearn.metrics import classification_report
 from sklearn.utils import class_weight
 
 # CONSTANTS
-DATA_DIR_PATH = os.path.join(os.getcwd(), '../data/data/')
+DATA_DIR_PATH = os.path.join(os.getcwd(), 'data/data/')
 BATCH_SIZE = 32
 IMAGE_SIZE = (224, 224)
 
 
 # This function was in a different module locally and ran only one time for easier and faster reading in my iterations
 def generate_dataframes():
-    train_labels_file = '../data/train_labels.txt'
+    train_labels_file = 'data/train_labels.txt'
     train_df = pd.read_csv(train_labels_file, header=0, names=['id', 'class'], sep=',')
     train_df['id'] = train_df['id'].astype(str)
     train_df['class'] = train_df['class'].astype(str)
 
-    validation_labels_file = '../data/validation_labels.txt'
+    validation_labels_file = 'data/validation_labels.txt'
     validation_df = pd.read_csv(validation_labels_file, header=0, names=['id', 'class'], sep=',')
     validation_df['id'] = validation_df['id'].astype(str)
     validation_df['class'] = validation_df['class'].astype(str)
@@ -44,11 +44,11 @@ def generate_dataframes():
 
 # Read dataframes
 def read_dataframes():
-    test_dataframe = pd.read_csv('../data_frames/test_dataframe.csv', sep=',', names=['id']).astype(str)
-    validation_dataframe = pd.read_csv('../data_frames/validation_dataframe.csv', sep=',',
+    test_dataframe = pd.read_csv('data_frames/test_dataframe.csv', sep=',', names=['id']).astype(str)
+    validation_dataframe = pd.read_csv('data_frames/validation_dataframe.csv', sep=',',
                                        names=['id', 'class']).astype(
         str)
-    train_dataframe = pd.read_csv('../data_frames/train_dataframe.csv', sep=',', names=['id', 'class']).astype(str)
+    train_dataframe = pd.read_csv('data_frames/train_dataframe.csv', sep=',', names=['id', 'class']).astype(str)
     return test_dataframe, validation_dataframe, train_dataframe
 
 
@@ -151,7 +151,11 @@ def generate_callbacks():
 
     # Visualize plots in real time while training
     tensorboard = TensorBoard(log_dir=f"logs/{time()}")
-    return learn_rate, early_stop, tensorboard
+
+    # Save model after each epoch
+    checkpoint_path = "saved_models/model_weights.{epoch:02d}.h5"
+    checkpoint = ModelCheckpoint(checkpoint_path, verbose=0)
+    return learn_rate, early_stop, tensorboard, checkpoint
 
 
 # CNN Model
@@ -234,7 +238,7 @@ if __name__ == '__main__':
     generate_dataframes()
     test_dataframe, validation_dataframe, train_dataframe = read_dataframes()
     train_generator, validation_generator, test_generator = create_generators()
-    learn_rate, early_stop, tensorboard = generate_callbacks()
+    learn_rate, early_stop, tensorboard, checkpoint = generate_callbacks()
     model = create_model()
 
     # Compile the model
@@ -245,7 +249,7 @@ if __name__ == '__main__':
     # Train model
     model.fit(train_generator, epochs=500, batch_size=BATCH_SIZE, verbose=1,
               validation_data=validation_generator, class_weight=calculate_class_weights(),
-              callbacks=[early_stop, tensorboard, learn_rate])
+              callbacks=[early_stop, tensorboard, learn_rate, checkpoint])
 
     print(f"--------------------------- {time() - start} ---------------------------")
 
