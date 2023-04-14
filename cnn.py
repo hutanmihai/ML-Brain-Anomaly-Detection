@@ -42,7 +42,7 @@ def generate_dataframes():
     test_dataframe.to_csv('../data_frames/test_dataframe.csv', index=False, header=False, columns=['id'])
 
 
-# Read dataframes
+# Read dataframes which contain the image namefiles and their labels
 def read_dataframes():
     test_dataframe = pd.read_csv('data_frames/test_dataframe.csv', sep=',', names=['id']).astype(str)
     validation_dataframe = pd.read_csv('data_frames/validation_dataframe.csv', sep=',',
@@ -82,6 +82,8 @@ def create_generators():
         rescale=1. / 255.0
     )
 
+    # Create generators from dataframes and the directory where the images are
+    # Convert them to grayscale and get them in batches of 32
     train_generator = train_data_gen.flow_from_dataframe(
         dataframe=train_dataframe,
         directory=DATA_DIR_PATH,
