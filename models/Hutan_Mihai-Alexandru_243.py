@@ -123,17 +123,24 @@ def write(predicted_labels):
 if __name__ == '__main__':
     start_time = time()
 
+    # Read the train and validation data and labels and generate numpy arrays
     train_images, train_labels, validation_images, validation_labels, test_images = \
         generate_numpy_arrays_for_train_and_validation()
 
+    # Instantiate the model
     model = RandomForestClassifier()
+    # Train the model
     model.fit(train_images, train_labels)
 
+    # Print the F1 score
     print(f1_score(validation_labels, model.predict(validation_images), average='binary'))
 
+    # Predict the labels for the test images
     predicted_labels = model.predict(test_images)
+    # Write the predicted labels to a CSV file for submission
     write(predicted_labels)
 
+    # Print the classification report
     print(classification_report(validation_labels, model.predict(validation_images)))
 
     end_time = time() - start_time

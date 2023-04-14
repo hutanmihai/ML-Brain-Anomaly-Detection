@@ -1,103 +1,127 @@
-import itertools
 import os
 from time import time
 
 import keras.backend as K
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization, ReLU
-from keras.losses import binary_crossentropy, binary_focal_crossentropy
+from keras.losses import binary_crossentropy
 from keras.models import Sequential
 from keras.optimizers import Adam
 from keras.preprocessing.image import ImageDataGenerator
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report
 from sklearn.utils import class_weight
 
-from utils.write import write
-
-# DATAFRAMES
-test_dataframe = pd.read_csv('../data_frames/test_dataframe.csv', sep=',', names=['id']).astype(str)
-validation_dataframe = pd.read_csv('../data_frames/validation_dataframe.csv', sep=',', names=['id', 'class']).astype(
-    str)
-train_dataframe = pd.read_csv('../data_frames/train_dataframe.csv', sep=',', names=['id', 'class']).astype(str)
-
-# PLOT THE UNBALANCED DATA
-fig, ax = plt.subplots(1, 2, figsize=(15, 5))
-train_dataframe['class'].value_counts().plot(kind='bar', ax=ax[0], title='Train')
-validation_dataframe['class'].value_counts().plot(kind='bar', ax=ax[1], title='Validation')
-plt.show()
-
-# CALCUALATE CLASS WEIGHTS
-train = train_dataframe['class'].values
-class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=np.unique(train), y=train)
-
-class_weights = {0: class_weights[0], 1: class_weights[1]}
-print(class_weights)
-
 # CONSTANTS
-data_dir_path = os.path.join(os.getcwd(), '../data/data/')
-batch_size = 35
-image_resize = (224, 224)
+DATA_DIR_PATH = os.path.join(os.getcwd(), '../data/data/')
+BATCH_SIZE = 32
+IMAGE_SIZE = (224, 224)
+
+
+# This function was in a different module locally and ran only one time for easier and faster reading in my iterations
+def generate_dataframes():
+    train_labels_file = '../data/train_labels.txt'
+    train_df = pd.read_csv(train_labels_file, header=0, names=['id', 'class'], sep=',')
+    train_df['id'] = train_df['id'].astype(str)
+    train_df['class'] = train_df['class'].astype(str)
+
+    validation_labels_file = '../data/validation_labels.txt'
+    validation_df = pd.read_csv(validation_labels_file, header=0, names=['id', 'class'], sep=',')
+    validation_df['id'] = validation_df['id'].astype(str)
+    validation_df['class'] = validation_df['class'].astype(str)
+
+    train_df['id'] = train_df['id'].apply(lambda x: str(x).zfill(6) + '.png')
+    validation_df['id'] = validation_df['id'].apply(lambda x: str(x).zfill(6) + '.png')
+
+    test_dataframe = pd.DataFrame()
+    test_dataframe['id'] = [str(i).zfill(6) + '.png' for i in range(17001, 22149 + 1)]
+
+    train_df.to_csv('../data_frames/train_dataframe.csv', index=False, header=False, columns=['id', 'class'])
+    validation_df.to_csv('../data_frames/validation_dataframe.csv', index=False, header=False, columns=['id', 'class'])
+    test_dataframe.to_csv('../data_frames/test_dataframe.csv', index=False, header=False, columns=['id'])
+
+
+# Read dataframes
+def read_dataframes():
+    test_dataframe = pd.read_csv('../data_frames/test_dataframe.csv', sep=',', names=['id']).astype(str)
+    validation_dataframe = pd.read_csv('../data_frames/validation_dataframe.csv', sep=',',
+                                       names=['id', 'class']).astype(
+        str)
+    train_dataframe = pd.read_csv('../data_frames/train_dataframe.csv', sep=',', names=['id', 'class']).astype(str)
+    return test_dataframe, validation_dataframe, train_dataframe
+
+
+# The data is unbalanced, so we calculate the class weights to use them in training
+def calculate_class_weights():
+    train = train_dataframe['class'].values
+    class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=np.unique(train), y=train)
+    class_weights = {0: class_weights[0], 1: class_weights[1]}
+    print(class_weights)
+    return class_weights
+
 
 # DATA GENERATORS
-train_data_gen = ImageDataGenerator(
-    rescale=1. / 255.0,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    zoom_range=0.1,
-    rotation_range=15,
-    fill_mode='nearest',
-    horizontal_flip=True
-)
+def create_generators():
+    # Augment data using ImageDataGenerator parameters
+    train_data_gen = ImageDataGenerator(
+        rescale=1. / 255.0,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.1,
+        rotation_range=15,
+        fill_mode='nearest',
+        horizontal_flip=True
+    )
 
-validation_data_gen = ImageDataGenerator(
-    rescale=1. / 255.0
-)
+    validation_data_gen = ImageDataGenerator(
+        rescale=1. / 255.0
+    )
 
-test_data_gen = ImageDataGenerator(
-    rescale=1. / 255.0
-)
+    test_data_gen = ImageDataGenerator(
+        rescale=1. / 255.0
+    )
 
-train_generator = train_data_gen.flow_from_dataframe(
-    dataframe=train_dataframe,
-    directory=data_dir_path,
-    x_col='id',
-    y_col='class',
-    target_size=image_resize,
-    color_mode='grayscale',
-    batch_size=batch_size,
-    class_mode='binary',
-    shuffle=True,
-)
+    train_generator = train_data_gen.flow_from_dataframe(
+        dataframe=train_dataframe,
+        directory=DATA_DIR_PATH,
+        x_col='id',
+        y_col='class',
+        target_size=IMAGE_SIZE,
+        color_mode='grayscale',
+        batch_size=BATCH_SIZE,
+        class_mode='binary',
+        shuffle=True,
+    )
 
-validation_generator = validation_data_gen.flow_from_dataframe(
-    dataframe=validation_dataframe,
-    directory=data_dir_path,
-    x_col='id',
-    y_col='class',
-    target_size=image_resize,
-    color_mode='grayscale',
-    batch_size=batch_size,
-    class_mode='binary',
-    shuffle=False,
-)
+    validation_generator = validation_data_gen.flow_from_dataframe(
+        dataframe=validation_dataframe,
+        directory=DATA_DIR_PATH,
+        x_col='id',
+        y_col='class',
+        target_size=IMAGE_SIZE,
+        color_mode='grayscale',
+        batch_size=BATCH_SIZE,
+        class_mode='binary',
+        shuffle=False,
+    )
 
-test_generator = test_data_gen.flow_from_dataframe(
-    dataframe=test_dataframe,
-    directory=data_dir_path,
-    x_col='id',
-    y_col=None,
-    target_size=image_resize,
-    color_mode='grayscale',
-    batch_size=batch_size,
-    class_mode=None,
-    shuffle=False,
-)
+    test_generator = test_data_gen.flow_from_dataframe(
+        dataframe=test_dataframe,
+        directory=DATA_DIR_PATH,
+        x_col='id',
+        y_col=None,
+        target_size=IMAGE_SIZE,
+        color_mode='grayscale',
+        batch_size=BATCH_SIZE,
+        class_mode=None,
+        shuffle=False,
+    )
+
+    return train_generator, validation_generator, test_generator
 
 
-# F1 SCORE FUNCTION
+# F1 Score function to use in metrics during training for visualization
 def score(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
@@ -108,123 +132,126 @@ def score(y_true, y_pred):
     return f1_val
 
 
-# CALLBACKS
-learn_rate = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, verbose=1, mode='auto', min_delta=1e-7,
-                               cooldown=1, min_lr=1e-7)
+# Callbacks used in training
+def generate_callbacks():
+    # Reduce learning rate after patience epochs of no improvement in loss
+    learn_rate = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, verbose=1, mode='auto', min_delta=1e-7,
+                                   cooldown=1, min_lr=1e-7)
 
-early_stop = EarlyStopping(monitor='val_score', min_delta=1e-4, patience=60, verbose=1, mode='max', baseline=None,
-                           restore_best_weights=True)
+    # Prevent overfitting by stopping training and restoring best weights
+    early_stop = EarlyStopping(monitor='val_score', min_delta=1e-4, patience=60, verbose=1, mode='max', baseline=None,
+                               restore_best_weights=True)
 
-tensorboard = TensorBoard(log_dir=f"logs/{time()}")
-
-# MODEL
-model = Sequential(
-    [
-        Conv2D(filters=32, kernel_size=3, padding='same',
-               input_shape=(image_resize[0], image_resize[1], 1)),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=32, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        MaxPooling2D(),
-        Dropout(0.2),
-
-        Conv2D(filters=64, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=64, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        MaxPooling2D(),
-        Dropout(0.2),
-
-        Conv2D(filters=128, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=128, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=128, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        MaxPooling2D(),
-        Dropout(0.2),
-
-        Conv2D(filters=256, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=256, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        Conv2D(filters=256, kernel_size=3, padding='same'),
-        BatchNormalization(),
-        ReLU(),
-        MaxPooling2D(),
-        Dropout(0.2),
-
-        Flatten(),
-        Dense(256),
-        ReLU(),
-        BatchNormalization(),
-        Dense(256),
-        ReLU(),
-        BatchNormalization(),
-        Dense(1, activation='sigmoid')
-    ]
-)
-
-model.summary()
-
-start = time()
-
-model.compile(optimizer=Adam(learning_rate=0.001), loss=binary_crossentropy, metrics=[score])
-
-history = model.fit(train_generator, epochs=500, batch_size=batch_size, verbose=1,
-                    validation_data=validation_generator, class_weight=class_weights,
-                    callbacks=[early_stop, tensorboard, learn_rate])
-
-print(f"--------------------------- {time() - start} ---------------------------")
+    # Visualize plots in real time while training
+    tensorboard = TensorBoard(log_dir=f"logs/{time()}")
+    return learn_rate, early_stop, tensorboard
 
 
-# CONFUSION MATRIX
-def show(matrix, type):
-    classes = [0, 1]
-    plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
-    plt.title("Confusion Matrix " + type)
-    plt.colorbar()
-    tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
-    fmt = 'd'
-    thresh = matrix.max() / 2.
-    for i, j in itertools.product(range(matrix.shape[0]), range(matrix.shape[1])):
-        plt.text(j, i, format(matrix[i, j], fmt),
-                 horizontalalignment="center",
-                 color="white" if matrix[i, j] > thresh else "black")
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.show()
+# CNN Model
+def create_model():
+    dropout = 0.2
+    kernel_size = 3
+    model = Sequential(
+        [
+            Conv2D(filters=32, kernel_size=kernel_size, padding='same',
+                   input_shape=(IMAGE_SIZE[0], IMAGE_SIZE[1], 1)),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=32, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            MaxPooling2D(),
+            Dropout(dropout),
+
+            Conv2D(filters=64, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=64, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            MaxPooling2D(),
+            Dropout(dropout),
+
+            Conv2D(filters=128, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=128, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=128, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            MaxPooling2D(),
+            Dropout(dropout),
+
+            Conv2D(filters=256, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=256, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            Conv2D(filters=256, kernel_size=kernel_size, padding='same'),
+            BatchNormalization(),
+            ReLU(),
+            MaxPooling2D(),
+            Dropout(dropout),
+
+            Flatten(),
+            Dense(256),
+            ReLU(),
+            BatchNormalization(),
+            Dense(256),
+            ReLU(),
+            BatchNormalization(),
+            Dense(1, activation='sigmoid')
+        ]
+    )
+    print(model.summary())
+    return model
 
 
-train_predicted_labels = model.predict(train_generator, verbose=1)
-train_predicted_labels = np.round(train_predicted_labels).astype(int).reshape(-1, )
-train_classes = train_generator.classes
-cm = confusion_matrix(train_classes, train_predicted_labels)
-show(cm, "Train")
+# Function used to write the predicted labels from test images to a CSV file for submission
+def write(predicted_labels):
+    labels = [int(i) for i in predicted_labels]
 
-val_predicted_labels = model.predict(validation_generator, verbose=1)
-val_predicted_labels = np.round(val_predicted_labels).astype(int).reshape(-1, )
-val_classes = validation_generator.classes
-cm = confusion_matrix(val_classes, val_predicted_labels)
-show(cm, "Validation")
+    # Create a DataFrame with the predicted labels
+    ids = [f"0{i}" for i in range(17001, 22149 + 1)]
+    predictions_df = pd.DataFrame({'id': ids,
+                                   'class': labels})
 
-print(classification_report(val_classes, val_predicted_labels))
+    # Write the DataFrame to a CSV file
+    predictions_df.to_csv('../submission.csv', index=False)
 
-# WRITE TEST PREDICTIONS
-predicted_labels = model.predict(test_generator, verbose=1)
-predicted_labels = np.round(predicted_labels).astype(int).reshape(-1, )
 
-write(predicted_labels)
+if __name__ == '__main__':
+    generate_dataframes()
+    test_dataframe, validation_dataframe, train_dataframe = read_dataframes()
+    train_generator, validation_generator, test_generator = create_generators()
+    learn_rate, early_stop, tensorboard = generate_callbacks()
+    model = create_model()
 
-print(f"-----------------------------------------------------")
+    # Compile the model
+    model.compile(optimizer=Adam(learning_rate=0.001), loss=binary_crossentropy, metrics=[score])
+
+    start = time()
+
+    # Train model
+    model.fit(train_generator, epochs=500, batch_size=BATCH_SIZE, verbose=1,
+              validation_data=validation_generator, class_weight=calculate_class_weights(),
+              callbacks=[early_stop, tensorboard, learn_rate])
+
+    print(f"--------------------------- {time() - start} ---------------------------")
+
+    # Prediction and classification report for validation data
+    val_predicted_labels = model.predict(validation_generator, verbose=1)
+    val_predicted_labels = np.round(val_predicted_labels).astype(int).reshape(-1, )
+    val_classes = validation_generator.classes
+    print(classification_report(val_classes, val_predicted_labels))
+
+    # Predict and write in submission.csv test data labels
+    predicted_labels = model.predict(test_generator, verbose=1)
+    predicted_labels = np.round(predicted_labels).astype(int).reshape(-1, )
+
+    write(predicted_labels)
+
+    print(f"-----------------------------------------------------")

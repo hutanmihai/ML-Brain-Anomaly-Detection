@@ -5,11 +5,6 @@ train_df = pd.read_csv(train_labels_file, header=0, names=['id', 'class'], sep='
 train_df['id'] = train_df['id'].astype(str)
 train_df['class'] = train_df['class'].astype(str)
 
-train_df_0 = train_df[train_df['class'] == '0']
-train_df_1 = train_df[train_df['class'] == '1']
-
-train_df = pd.concat([train_df_0, train_df_1])
-
 validation_labels_file = '../data/validation_labels.txt'
 validation_df = pd.read_csv(validation_labels_file, header=0, names=['id', 'class'], sep=',')
 validation_df['id'] = validation_df['id'].astype(str)
