@@ -1,7 +1,7 @@
 import os
 from time import time
 
-import keras.backend as K
+import keras.backend as kb
 import numpy as np
 import pandas as pd
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard
@@ -122,13 +122,20 @@ def create_generators():
 
 
 # F1 Score function to use in metrics during training for visualization
-def score(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + K.epsilon())
-    recall = true_positives / (possible_positives + K.epsilon())
-    f1_val = 2 * (precision * recall) / (precision + recall + K.epsilon())
+def score(actual_values, predictions):
+    prod = actual_values * predictions
+    # True positives
+    tp = kb.sum(kb.round(prod))
+    # False positives
+    fp = kb.sum(kb.round((1 - actual_values) * predictions))
+    # False negatives
+    fn = kb.sum(kb.round(actual_values * (1 - predictions)))
+    # Precision
+    precision = tp / (tp + fp)
+    # Recall
+    recall = tp / (tp + fn)
+    # F1 Score
+    f1_val = 2 * (precision * recall) / (precision + recall)
     return f1_val
 
 
