@@ -129,13 +129,13 @@ def score(actual_values, predictions):
     # False positives
     fp = kb.sum(kb.round((1 - actual_values) * predictions))
     # False negatives
-    fn = kb.sum(kb.round(actual_values * (1 - predictions)))
+    fn = kb.sum(kb.round((actual_values * (1 - predictions))))
     # Precision
-    precision = tp / (tp + fp)
+    precision = tp / (tp + fp + 1e-9)  # 1e-9 to avoid division by zero
     # Recall
-    recall = tp / (tp + fn)
+    recall = tp / (tp + fn + 1e-9)  # 1e-9 to avoid division by zero
     # F1 Score
-    f1_val = 2 * (precision * recall) / (precision + recall)
+    f1_val = 2 * (precision * recall) / (precision + recall + 1e-9)  # 1e-9 to avoid division by zero
     return f1_val
 
 
